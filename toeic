@@ -1,0 +1,131 @@
+import os
+import pandas as pd  #處理資料格式套件
+import pyttsx3       #語音套件
+import tkinter as tk
+from tkinter import messagebox
+
+# 設定 Excel 檔案路徑 連結路徑
+folder_path = "C:/Users/user/Desktop/chun/toeic_words"
+file_path = os.path.join(folder_path, "toeic_words.xlsx") 
+
+# 確認資料夾存在 若沒有就建立它
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
+
+# 讀取 Excel，如果沒有就建立它
+# df=讀取的excel檔案 <class 'pandas.core.frame.DataFrame'>
+# pd套件與dataframe搭配
+def load_excel_file():
+    if os.path.exists(file_path):
+        return pd.read_excel(file_path)
+    else:
+        df = pd.DataFrame(columns=["單字"])
+        df.to_excel(file_path, index=False)  # 輸出不顯示索引的值
+        return df
+
+### 儲存單字到 Excel
+# word_entry=用戶輸入的英文單字
+def save_word():
+    word = word_entry.get().strip()          # 取得輸入的單字並去除空白
+    if word:                                 # 檢查字串    
+        df.loc[len(df)] = [word]
+        #新增單字到df (loc:獲取特定標籤(label)的行或列 它可以被讀取也能被賦值)
+        df.to_excel(file_path, index=False)  # 存檔至excel #輸出不顯示索引的值
+        word_entry.delete(0, tk.END)         # 清空輸入框(從索引0計算刪除到最後)
+        messagebox.showinfo("成功", f"單字 '{word}' 已儲存！")
+    else:                                    # 輸入空白或沒輸入
+        messagebox.showwarning("警告", "請輸入單字！")
+
+# 讀取並朗讀單字
+def review_words():
+    global current_word_index                # 設為全域變數
+    df = load_excel_file()                   # 更新df資料
+    if df.empty:                             # 檢查 DataFrame的行是否為空(沒輸入過單字)
+        messagebox.showwarning("警告", "目前沒有單字可複習！")
+        return                               # 回傳None 結束函數 
+
+    words = df["單字"].tolist()
+    # 提取一欄 型態是series
+    # 用Series的tolist方法(一維資料結構,提取成python的list)取得所有單字 初始化
+    current_word_index = 0
+    # 初始化當前單字的索引 避免下次讀取時是從上次複習的單字繼續
+
+    if words:
+        word_label.config(text=words[current_word_index])
+        # 單字列表中當前索引位置的單字 因(current_word_index = 0)所以顯示第一個單字
+        # 修改word_label的text屬性 由""變成"apple"(假設第一個單字apple)
+        speak_word(words[current_word_index], speak_speed=130)  # 發音並設置語速
+        more_onetime.config(state=tk.NORMAL)
+        # state用於控制元件的狀態  啟用「再唸一次」按鈕
+        # 將more_onetime的屬性從原本DISABLED(禁用)變成NORMAL(可按）
+        next_word_button.config(state=tk.NORMAL)
+        # 啟用「下一個單字」按鈕
+
+# 朗讀單字
+def speak_word(word, speak_speed=130):
+    engine = pyttsx3.init("sapi5")                  # 微軟的語音服務接口
+    engine.setProperty("rate", speak_speed)
+    # setProperty:pyttsx3的方法,用於調整語音引擎的屬性  使用傳入的語速參數
+    engine.setProperty("voice", "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0")
+    # 設定語音
+    engine.say(word)                               # 告訴語音引擎要朗讀的文字
+    engine.runAndWait()                            # 發出語音並確保說完才結束函數
+
+# 再唸一次
+def repeat_word():
+    if current_word_index < len(df):
+        word = df["單字"].iloc[current_word_index]
+        # loc用標籤找，iloc用數字找且從0開始 剛好跟current_word_index=0吻合 所以用iloc
+        speak_word(word, 130)  # 再次發音
+
+# 顯示下一個單字
+def next_word():
+    global current_word_index                # 告訴 Python 使用的是同一個全域變數
+    df = load_excel_file()
+    words = df["單字"].tolist()              # 準備單字列表
+
+    if current_word_index + 1 < len(words):  # 確保還有下一個單字
+        current_word_index += 1
+        word_label.config(text=words[current_word_index])  # 顯示下一個單字
+        speak_word(words[current_word_index], 130)  # 朗讀下一個單字
+    else:
+        messagebox.showinfo("訊息", "已經是最後一個單字！")
+        next_word_button.config(state=tk.DISABLED)  # 禁用「下一個單字」按鈕
+        
+        
+if __name__ == '__main__':
+
+    root = tk.Tk()
+    root.title("TOEIC 單字學習")
+    root.geometry("400x300")
+
+    # 讀取 Excel
+    df = load_excel_file()
+
+    # 單字輸入框
+    word_entry = tk.Entry(root, width=30)
+    word_entry.pack(pady=10)
+
+    # 儲存按鈕
+    save_button = tk.Button(root, text="儲存單字", command=save_word)
+    save_button.pack(pady=5)
+
+    # 複習按鈕
+    review_button = tk.Button(root, text="開始複習", command=review_words)
+    review_button.pack(pady=5)
+
+    # 顯示單字的標籤
+    word_label = tk.Label(root, text="", font=("Arial", 20)) #預設空字串
+    word_label.pack(pady=20)
+
+    # 再唸一次按鈕，初始時禁用
+    more_onetime = tk.Button(root, text="再唸一次", state=tk.DISABLED, command=repeat_word)
+    #預設狀態DISABLED(禁用)  當發生command事件時(點擊再唸一次)叫用repeat_word函數
+    more_onetime.pack(pady=8)
+
+    # 下一個單字按鈕，初始時禁用
+    next_word_button = tk.Button(root, text="下一個單字", state=tk.DISABLED, command=next_word)
+    next_word_button.pack(pady=8)
+
+    # 啟動程式
+    root.mainloop()
