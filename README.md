@@ -1,1 +1,2 @@
-# englishword
+記憶單字可用的小程式 
+會儲存在excel
